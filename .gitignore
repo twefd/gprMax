@@ -20,3 +20,12 @@ dist/
 
 # Jupyter notebook checkpoints
 .ipynb_checkpoints/
+
+# GPR Concrete Studio run artifacts — but KEEP .gprstudio.json preset/scene files
+gpr_studio/projects/**/*.in
+gpr_studio/projects/**/*.out
+gpr_studio/projects/**/*.png
+gpr_studio/projects/**/*.vti
+
+# GPR Concrete Studio user-customised material library (per-machine)
+gpr_studio/materials_library.json
