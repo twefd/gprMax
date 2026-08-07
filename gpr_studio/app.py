@@ -154,6 +154,40 @@ def build_survey(scene: Scene) -> Survey:
 
 
 # --------------------------------------------------------------------------- #
+# Lag-free survey inputs
+# --------------------------------------------------------------------------- #
+# Streamlit lags one rerun behind when a widget takes its value in as a default
+# and its return is written back (the old ``ss.x = st.number_input(value=ss.x)``
+# pattern) — that is why tab 1 only updated on the *second* press. Instead bind
+# each input to its own key so the widget owns its state (commits on the first
+# interaction), seed that key once per ``editor_nonce`` from the canonical value,
+# and mirror the live value straight back to ``ss[key]``. Anything that changes a
+# survey value from outside the widget (presets, import, equipment change, fit
+# scan) sets ``ss[key]`` and bumps ``editor_nonce`` so the widget re-seeds.
+def _survey_number(label: str, key: str, *, cast=float, **kw):
+    ss = st.session_state
+    wkey = f"_inp_{key}_{ss.get('editor_nonce', 0)}"
+    if wkey not in ss:
+        ss[wkey] = cast(ss[key])
+    ss[key] = st.number_input(label, key=wkey, **kw)
+    return ss[key]
+
+
+def _survey_slider(label: str, key: str, *, cast=float, **kw):
+    ss = st.session_state
+    wkey = f"_inp_{key}_{ss.get('editor_nonce', 0)}"
+    if wkey not in ss:
+        ss[wkey] = cast(ss[key])
+    ss[key] = st.slider(label, key=wkey, **kw)
+    return ss[key]
+
+
+def _bump_nonce() -> None:
+    """Force keyed survey inputs (and the editors) to re-seed from state."""
+    st.session_state.editor_nonce = st.session_state.get("editor_nonce", 0) + 1
+
+
+# --------------------------------------------------------------------------- #
 # UI sections
 # --------------------------------------------------------------------------- #
 def section_equipment() -> None:
@@ -176,36 +210,35 @@ def section_equipment() -> None:
             ss.center_freq_ghz = eq.center_freq_hz / GHZ
             ss.tx_rx_offset_mm = eq.tx_rx_offset_m / MM
             ss.trace_step_mm = eq.trace_step_m / MM
+            _bump_nonce()  # re-seed the survey inputs from the new preset
             st.rerun()
         eq = EQUIPMENT_PRESETS[ss.equipment_key]
         st.info(eq.note)
-        ss.center_freq_ghz = st.slider(
-            "Centre frequency [GHz]", 0.2, 4.0, float(ss.center_freq_ghz), 0.1)
-        ss.tx_rx_offset_mm = st.number_input(
-            "Tx–Rx antenna offset [mm]", 0.0, 300.0,
-            float(ss.tx_rx_offset_mm), 5.0)
+        _survey_slider("Centre frequency [GHz]", "center_freq_ghz",
+                       min_value=0.2, max_value=4.0, step=0.1)
+        _survey_number("Tx–Rx antenna offset [mm]", "tx_rx_offset_mm",
+                       min_value=0.0, max_value=300.0, step=5.0)
 
     with col2:
-        ss.scan_length_cm = st.number_input(
-            "Scan length [cm]", 5.0, 500.0, float(ss.scan_length_cm), 5.0)
+        _survey_number("Scan length [cm]", "scan_length_cm",
+                       min_value=5.0, max_value=500.0, step=5.0)
         # Convenience: extend the scan so the antenna crosses every object.
         needed_cm = infile.full_scan_length(build_scene()) * 100
         if st.button(f"↔ Fit scan to model ({needed_cm:.0f} cm)",
                      help="Set scan length so the antenna passes over every "
                           "object in the geometry"):
             ss.scan_length_cm = round(needed_cm, 1)
+            _bump_nonce()  # re-seed the scan-length input with the fitted value
             st.rerun()
-        ss.trace_step_mm = st.number_input(
-            "Trace spacing [mm]", 1.0, 50.0, float(ss.trace_step_mm), 1.0)
-        ss.max_depth_cm = st.number_input(
-            "Max depth of interest [cm]", 5.0, 150.0,
-            float(ss.max_depth_cm), 5.0)
+        _survey_number("Trace spacing [mm]", "trace_step_mm",
+                       min_value=1.0, max_value=50.0, step=1.0)
+        _survey_number("Max depth of interest [cm]", "max_depth_cm",
+                       min_value=5.0, max_value=150.0, step=5.0)
         with st.expander("Advanced (grid & boundary)"):
-            ss.dx_override_mm = st.number_input(
-                "Cell size override [mm] (0 = auto)", 0.0, 10.0,
-                float(ss.dx_override_mm), 0.5)
-            ss.pml_cells = st.number_input(
-                "PML cells", 6, 20, int(ss.pml_cells), 1)
+            _survey_number("Cell size override [mm] (0 = auto)", "dx_override_mm",
+                           min_value=0.0, max_value=10.0, step=0.5)
+            _survey_number("PML cells", "pml_cells", cast=int,
+                           min_value=6, max_value=20, step=1)
 
     # Derived quantities
     scene = build_scene()
