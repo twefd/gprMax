@@ -15,6 +15,7 @@ import os
 import subprocess
 import sys
 import glob
+import time
 from pathlib import Path
 from typing import Callable, Iterator
 
@@ -75,6 +76,89 @@ def run_gprmax(in_path: Path, n_traces: int | None = None,
             on_line(line.rstrip("\n"))
     proc.wait()
     return proc.returncode
+
+
+# --------------------------------------------------------------------------- #
+# Parallel B-scan (task farm)
+# --------------------------------------------------------------------------- #
+def auto_workers(n_traces: int, cap: int = 8) -> int:
+    """A sensible default worker count: capped, and never more than traces/cores.
+
+    Beyond ~8 workers these small 2D models saturate memory bandwidth rather
+    than cores, so returns are flat — hence the cap.
+    """
+    cores = os.cpu_count() or 4
+    return max(1, min(cap, cores, max(1, n_traces)))
+
+
+def _count_traces(base: Path, n_traces: int) -> int:
+    files = [f for f in glob.glob(str(base) + "[0-9]*.out") if "_merged" not in f]
+    return min(len(files), n_traces)
+
+
+def run_bscan_parallel(in_path: Path, n_traces: int, workers: int,
+                       on_progress: Callable[[int, int], None] | None = None,
+                       poll: float = 0.4) -> tuple[int, str]:
+    """Run a B-scan as a task farm: split traces across ``workers`` processes.
+
+    Each worker runs a contiguous chunk with ``-restart`` + ``--geometry-fixed``
+    (geometry is built once per worker; only the antenna moves), sharing the CPU
+    via ``OMP_NUM_THREADS = cores / workers``. Produces the same per-trace
+    ``.out`` files as a sequential ``-n`` run, so the usual merge works
+    unchanged. Returns (returncode, combined_log_tail).
+    """
+    base = in_path.with_suffix("")
+    # Clear any stale trace files so progress + merge are clean.
+    for f in glob.glob(str(base) + "[0-9]*.out"):
+        try:
+            os.remove(f)
+        except OSError:
+            pass
+
+    cores = os.cpu_count() or 4
+    workers = max(1, min(workers, n_traces))
+    threads_per = max(1, cores // workers)
+    per = -(-n_traces // workers)  # ceil division -> contiguous chunks
+
+    procs, logs, logpaths = [], [], []
+    for w in range(workers):
+        start = 1 + w * per
+        count = min(per, n_traces - (start - 1))
+        if count <= 0:
+            break
+        env = dict(os.environ)
+        env["OMP_NUM_THREADS"] = str(threads_per)
+        logpath = Path(str(base) + f"_w{w}.log")
+        logf = open(logpath, "w", encoding="utf-8")
+        logs.append(logf)
+        logpaths.append(logpath)
+        cmd = [env_python(), "-m", "gprMax", str(in_path), "-n", str(count),
+               "-restart", str(start), "--geometry-fixed"]
+        procs.append(subprocess.Popen(cmd, cwd=str(REPO_ROOT), env=env,
+                                      stdout=logf, stderr=subprocess.STDOUT))
+
+    while any(p.poll() is None for p in procs):
+        if on_progress:
+            on_progress(_count_traces(base, n_traces), n_traces)
+        time.sleep(poll)
+    rcs = [p.wait() for p in procs]
+    for logf in logs:
+        logf.close()
+    if on_progress:
+        on_progress(_count_traces(base, n_traces), n_traces)
+
+    # Collect log tails (useful if a worker failed).
+    tails = []
+    for lp in logpaths:
+        try:
+            tails.append(f"--- {lp.name} ---\n" + lp.read_text(encoding="utf-8")[-1500:])
+        except OSError:
+            pass
+        try:
+            lp.unlink()
+        except OSError:
+            pass
+    return (max(rcs) if rcs else 1), "\n".join(tails)
 
 
 # --------------------------------------------------------------------------- #
