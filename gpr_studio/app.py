@@ -1,4 +1,4 @@
-"""GPR Concrete Studio — Streamlit application.
+"""gprStudio — Streamlit application.
 
 A four-step guided workflow on top of gprMax:
     1. Equipment & survey     2. Materials
@@ -28,7 +28,7 @@ from gpr_studio.model import (Scene, Survey, Layer, RebarRow, Bar, VoidBox,
                              DiagonalVoid, OvalRow)
 from gpr_studio import infile, preview, runner, scenes, build
 
-st.set_page_config(page_title="GPR Concrete Studio", page_icon="📡",
+st.set_page_config(page_title="gprStudio", page_icon="📡",
                    layout="wide")
 
 CM = 0.01      # cm -> m
@@ -802,7 +802,7 @@ def _show_last_result() -> None:
 # --------------------------------------------------------------------------- #
 def main() -> None:
     _init_state()
-    st.title("📡 GPR Concrete Studio")
+    st.title("📡 gprStudio")
     st.caption("Model real concrete-inspection scenarios with gprMax — build, "
                "preview, simulate.")
 

@@ -1,4 +1,4 @@
-"""GPR equipment presets for GPR Concrete Studio.
+"""GPR equipment presets for gprStudio.
 
 gprMax is a time-domain (FDTD) solver.  The Proceq GP8000 is a stepped-frequency
 continuous-wave (SFCW) system spanning 0.2-4 GHz.  We approximate its response

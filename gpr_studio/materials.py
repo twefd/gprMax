@@ -1,4 +1,4 @@
-"""Material library for GPR Concrete Studio.
+"""Material library for gprStudio.
 
 Each material carries the four parameters gprMax's ``#material`` command expects:
 relative permittivity (er), conductivity (sigma, S/m), relative permeability

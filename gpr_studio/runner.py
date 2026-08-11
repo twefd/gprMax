@@ -1,4 +1,4 @@
-"""Run gprMax from GPR Concrete Studio and post-process the results.
+"""Run gprMax from gprStudio and post-process the results.
 
 Responsibilities:
 * write the generated ``.in`` file into a per-project folder,

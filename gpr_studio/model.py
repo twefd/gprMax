@@ -1,4 +1,4 @@
-"""Scene model for GPR Concrete Studio.
+"""Scene model for gprStudio.
 
 A :class:`Scene` describes a 2D vertical cross-section: a stack of horizontal
 material layers (top = surface) plus a list of embedded objects (rebar rows,
@@ -136,7 +136,7 @@ class Scene:
     """A complete cross-section: layers + embedded objects + metadata."""
 
     name: str = "concrete_scene"
-    title: str = "GPR Concrete Studio model"
+    title: str = "gprStudio model"
     layers: list[Layer] = field(default_factory=list)
     rebar_rows: list[RebarRow] = field(default_factory=list)
     bars: list[Bar] = field(default_factory=list)

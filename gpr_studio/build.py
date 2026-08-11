@@ -59,7 +59,7 @@ def scene_from_state(s: dict) -> Scene:
         material=o.get("material", "air"), label=o.get("label", "Oval void"),
     ) for o in s.get("ovals", []) if o.get("material") and int(_f(o.get("count", 0))) > 0]
     return Scene(name=s.get("project_name", "scene"),
-                 title=s.get("title", "GPR Concrete Studio model"),
+                 title=s.get("title", "gprStudio model"),
                  layers=layers, rebar_rows=rebar, bars=bars, voids=voids,
                  diagonals=diagonals, ovals=ovals)
 

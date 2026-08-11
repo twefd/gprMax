@@ -1,4 +1,4 @@
-# GPR Concrete Studio
+# gprStudio
 
 A guided, local web application for modelling real concrete-inspection
 scenarios with [gprMax](http://www.gprmax.com). Build a 2D cross-section

@@ -1,4 +1,4 @@
-"""Headless end-to-end self-test for GPR Concrete Studio.
+"""Headless end-to-end self-test for gprStudio.
 
 Builds a representative scene, generates the gprMax input file, renders a
 preview PNG, then optionally runs gprMax. Usage:
