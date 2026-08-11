@@ -12,14 +12,6 @@ approximates real GPR gear — the **Proceq GP8000** by default.
   voids/delaminations, **diagonal cracks** (angled features), and **oval voids**
   (hollow-core channels / oval ducts). A live cross-section preview shows the
   model *before* you simulate.
-- **Click-to-place editing** — pick an element type (rebar row, bar/conduit,
-  void/block, diagonal crack, oval void) and a material, then **click directly on
-  the cross-section preview** to drop it at that spot. Position comes from the
-  click (boxes/ovals/bars are centred on it; rows and cracks start there); size
-  and spacing use sensible defaults you can fine-tune in the tables. An **Undo
-  add** button removes the last placed element. Requires the
-  `streamlit-image-coordinates` package (see Requirements); without it the
-  preview falls back to a static image.
 - **Geometry presets** — one-click starting points: concrete slab in air,
   foundation beam with footing, delamination case, hollow-core slab
   (kanaalplaatvloer), and a diagonal-crack slab.
@@ -44,12 +36,10 @@ approximates real GPR gear — the **Proceq GP8000** by default.
 ## Requirements
 
 - A working gprMax install (compiled Cython extensions) in a conda env.
-- `streamlit` and `streamlit-image-coordinates` installed in that same env:
+- `streamlit` installed in that same env:
   ```powershell
-  & "$env:USERPROFILE\miniconda3\envs\gprMax\python.exe" -m pip install streamlit streamlit-image-coordinates
+  & "$env:USERPROFILE\miniconda3\envs\gprMax\python.exe" -m pip install streamlit
   ```
-  `streamlit-image-coordinates` powers the click-to-place editing; if it is not
-  installed the app still runs and shows a static preview instead.
 
 ## Launch
 
@@ -97,8 +87,7 @@ Generated input files, outputs and images are written to
 | `equipment.py` | GPR equipment presets (GP8000, generics) |
 | `model.py` | Scene dataclasses (layers, rebar, bars, voids, diagonals, ovals, survey) |
 | `infile.py` | Scene+Survey → gprMax `.in` (coordinate mapping, auto grid, triangles for angled/oval shapes) |
-| `preview.py` | Matplotlib cross-section renderer + click→coordinate mapping |
-| `click_canvas.py` | Wrapper for the click-to-place image component (version shim) |
+| `preview.py` | Matplotlib cross-section renderer |
 | `runner.py` | Runs gprMax, merges + plots, adjustable B-scan viewer, cleans up |
 | `build.py` | Shared state-dict → Scene/Survey conversion |
 | `scenes.py` | Save/import scene files, gprMax `.in` parser, dynamic presets |
