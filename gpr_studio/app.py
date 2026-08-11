@@ -19,14 +19,17 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
+import io
+
 import pandas as pd
 import streamlit as st
+from PIL import Image
 
 from gpr_studio.materials import Material, default_library
 from gpr_studio.equipment import EQUIPMENT_PRESETS, DEFAULT_EQUIPMENT_KEY
 from gpr_studio.model import (Scene, Survey, Layer, RebarRow, Bar, VoidBox,
                              DiagonalVoid, OvalRow)
-from gpr_studio import infile, preview, runner, scenes, build
+from gpr_studio import infile, preview, runner, scenes, build, click_canvas
 
 st.set_page_config(page_title="GPR Concrete Studio", page_icon="📡",
                    layout="wide")
@@ -503,6 +506,68 @@ def _element_editor(state_key: str, title: str, optional: bool = False) -> None:
     ss[state_key] = edited.to_dict("records")
 
 
+# --------------------------------------------------------------------------- #
+# Click-to-place on the preview
+# --------------------------------------------------------------------------- #
+# Element types that can be dropped by clicking the cross-section. Layers span
+# the full width, so they are placed via the table, not by clicking.
+_PLACE_TYPES: dict[str, str] = {
+    "Rebar row": "rebar",
+    "Single bar / conduit": "bars",
+    "Void / block": "voids",
+    "Diagonal crack": "diagonals",
+    "Oval void": "ovals",
+}
+
+
+def _row_from_click(state_key: str, x_cm: float, depth_cm: float,
+                    material: str) -> dict:
+    """Build a new element row anchored at a clicked (x, depth), in cm.
+
+    Boxes/ovals/bars are centred on the click; rows and cracks start there.
+    Sizes come from the element template and are editable in the table.
+    """
+    row = dict(_ELEMENT_TEMPLATES[state_key])
+    row["material"] = material
+    x, d = round(x_cm, 1), round(depth_cm, 1)
+    if state_key == "voids":  # click = centre of the box
+        row["x_cm"] = round(max(0.0, x_cm - row["width_cm"] / 2), 1)
+        row["depth_cm"] = round(max(0.0, depth_cm - row["height_cm"] / 2), 1)
+    elif state_key == "rebar":
+        row["x_start_cm"], row["depth_cm"] = x, d
+    elif state_key == "ovals":
+        row["cx_cm"], row["depth_cm"] = x, d
+    else:  # bars, diagonals
+        row["x_cm"], row["depth_cm"] = x, d
+    return row
+
+
+def _place_element(state_key: str, x_cm: float, depth_cm: float,
+                   material: str) -> None:
+    ss = st.session_state
+    row = _row_from_click(state_key, x_cm, depth_cm, material)
+    ss[state_key] = list(ss.get(state_key) or []) + [row]
+    ss.setdefault("_place_undo", []).append(state_key)
+    ss["_place_last"] = (f"{row.get('label', state_key)} at "
+                         f"x={x_cm:.0f} cm, depth={depth_cm:.0f} cm")
+    _bump_nonce()  # rebuild the editor tables so the new row shows
+
+
+def _undo_last_placement() -> None:
+    """Callback: remove the most recently click-placed element."""
+    ss = st.session_state
+    stack = ss.get("_place_undo") or []
+    if not stack:
+        return
+    state_key = stack.pop()
+    rows = list(ss.get(state_key) or [])
+    if rows:
+        rows.pop()
+        ss[state_key] = rows
+    ss["_place_last"] = None
+    _bump_nonce()
+
+
 def section_geometry() -> None:
     ss = st.session_state
     n = ss.get("editor_nonce", 0)
@@ -598,7 +663,7 @@ def section_geometry() -> None:
                         f"{reach_cm:.0f} cm). Use **Fit scan to model** on the "
                         "Equipment tab.")
                 fig = preview.render(scene, survey, build_materials())
-                st.pyplot(fig, width="stretch")
+                _interactive_preview(fig, n)
 
                 with st.expander("Generated gprMax input file (.in)"):
                     text = infile.generate(scene, survey, build_materials())
@@ -607,6 +672,73 @@ def section_geometry() -> None:
                                        file_name=f"{ss.project_name}.in")
             except Exception as exc:  # noqa: BLE001 - surface errors to the user
                 st.error(f"Preview / input-file error: {exc}")
+
+
+def _interactive_preview(fig, n: int) -> None:
+    """Show the cross-section and let the user drop elements by clicking it.
+
+    Falls back to a static image if the click component is unavailable.
+    """
+    ss = st.session_state
+    import matplotlib.pyplot as _plt
+
+    if not click_canvas.AVAILABLE:
+        st.pyplot(fig, width="stretch")
+        _plt.close(fig)
+        st.caption("Install `streamlit-image-coordinates` in the gprMax env to "
+                   "enable click-to-place editing of the preview.")
+        return
+
+    # --- pick what to drop, and its material ---
+    c1, c2 = st.columns([1.25, 1])
+    place_label = c1.selectbox(
+        "🖱️ Click preview to add", ["(off — just view)"] + list(_PLACE_TYPES),
+        key="_place_type",
+        help="Choose an element, then click on the cross-section to drop it "
+             "there. Position comes from the click; size/spacing are taken from "
+             "sensible defaults and can be fine-tuned in the tables on the left.")
+    placing = place_label in _PLACE_TYPES
+    place_mat = None
+    if placing:
+        opts = material_names()
+        default_mat = _ELEMENT_TEMPLATES[_PLACE_TYPES[place_label]]["material"]
+        if ss.get("_place_mat") not in opts:
+            ss["_place_mat"] = default_mat if default_mat in opts else opts[0]
+        place_mat = c2.selectbox("Material", opts, key="_place_mat")
+
+    # --- render the figure to a PNG + the pixel->cm mapping, then show it ---
+    mapping = preview.axes_mapping(fig)
+    buf = io.BytesIO()
+    fig.savefig(buf, format="png", dpi=110)  # default bbox keeps axes fractions valid
+    _plt.close(fig)
+    buf.seek(0)
+    img = Image.open(buf)
+
+    coords = click_canvas.image_coordinates(
+        img, use_column_width="always",
+        cursor="crosshair" if placing else "default",
+        key=f"geom_canvas_{n}")
+
+    # --- handle a fresh click (dedupe on the component's click timestamp) ---
+    if (placing and coords
+            and coords.get("unix_time") != ss.get("_canvas_last_ut")):
+        ss["_canvas_last_ut"] = coords.get("unix_time")
+        hit = preview.click_to_cm(mapping, coords["x"], coords["y"],
+                                  coords["width"], coords["height"])
+        if hit:
+            _place_element(_PLACE_TYPES[place_label], hit[0], hit[1], place_mat)
+            st.rerun()
+
+    # --- status line + undo ---
+    s1, s2 = st.columns([2, 1])
+    s1.caption(f"Click the section to drop a **{place_label.lower()}**."
+               if placing else
+               "Pick an element above, then click on the preview to place it.")
+    if ss.get("_place_undo"):
+        s2.button("↶ Undo add", key=f"undo_place_{n}", width="stretch",
+                  on_click=_undo_last_placement)
+    if placing and ss.get("_place_last"):
+        st.success(f"Added {ss['_place_last']}")
 
 
 def section_run() -> None:
@@ -792,4 +924,5 @@ def main() -> None:
         section_run()
 
 
-main()
+if __name__ == "__main__":
+    main()
