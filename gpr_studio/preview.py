@@ -18,7 +18,7 @@ from .materials import Material
 from .model import Scene, Survey
 from .infile import Layout, content_depth, diagonal_corners, oval_centers
 
-M2CM = 100.0
+M2MM = 1000.0
 
 
 def render(scene: Scene, survey: Survey,
@@ -48,7 +48,7 @@ def render(scene: Scene, survey: Survey,
         top = depth_cursor
         bottom = depth_span_m if i == n - 1 else depth_cursor + layer.thickness_m
         ax.add_patch(Rectangle(
-            (0, top * M2CM), x_span_m * M2CM, (bottom - top) * M2CM,
+            (0, top * M2MM), x_span_m * M2MM, (bottom - top) * M2MM,
             facecolor=color(layer.material), edgecolor="none", zorder=1))
         register(layer.material)
         depth_cursor += layer.thickness_m
@@ -60,8 +60,8 @@ def render(scene: Scene, survey: Survey,
 
     for v in scene.voids:
         ax.add_patch(Rectangle(
-            (v.x_m * M2CM, v.depth_m * M2CM),
-            v.width_m * M2CM, v.height_m * M2CM,
+            (v.x_m * M2MM, v.depth_m * M2MM),
+            v.width_m * M2MM, v.height_m * M2MM,
             facecolor=color(v.material), edgecolor="k", lw=0.8,
             hatch="////" if is_defect(v.material) else None, zorder=3))
         register(v.material)
@@ -70,19 +70,19 @@ def render(scene: Scene, survey: Survey,
     for b in scene.bars:
         if b.grout_material and b.grout_diameter_m > 0:
             ax.add_patch(Circle(
-                (b.x_m * M2CM, b.depth_m * M2CM),
-                (b.diameter_m / 2) * M2CM,
+                (b.x_m * M2MM, b.depth_m * M2MM),
+                (b.diameter_m / 2) * M2MM,
                 facecolor=color(b.material), edgecolor="k", lw=0.8, zorder=3))
             ax.add_patch(Circle(
-                (b.x_m * M2CM, b.depth_m * M2CM),
-                (b.grout_diameter_m / 2) * M2CM,
+                (b.x_m * M2MM, b.depth_m * M2MM),
+                (b.grout_diameter_m / 2) * M2MM,
                 facecolor=color(b.grout_material), edgecolor="none", zorder=4))
             register(b.material)
             register(b.grout_material)
         else:
             ax.add_patch(Circle(
-                (b.x_m * M2CM, b.depth_m * M2CM),
-                (b.diameter_m / 2) * M2CM,
+                (b.x_m * M2MM, b.depth_m * M2MM),
+                (b.diameter_m / 2) * M2MM,
                 facecolor=color(b.material), edgecolor="k", lw=0.8, zorder=3))
             register(b.material)
 
@@ -92,14 +92,14 @@ def render(scene: Scene, survey: Survey,
         for k in range(row.count):
             xc = row.x_start_m + k * row.spacing_m
             ax.add_patch(Circle(
-                (xc * M2CM, row.depth_m * M2CM),
-                (row.diameter_m / 2) * M2CM,
+                (xc * M2MM, row.depth_m * M2MM),
+                (row.diameter_m / 2) * M2MM,
                 facecolor=color(row.material), edgecolor="k", lw=0.8, zorder=3))
 
     # --- diagonal cracks / voids ---
     for d in scene.diagonals:
         register(d.material)
-        pts = [(x * M2CM, dep * M2CM) for x, dep in diagonal_corners(d)]
+        pts = [(x * M2MM, dep * M2MM) for x, dep in diagonal_corners(d)]
         ax.add_patch(Polygon(pts, closed=True, facecolor=color(d.material),
                              edgecolor="k", lw=0.8, hatch="////", zorder=3))
 
@@ -108,28 +108,28 @@ def render(scene: Scene, survey: Survey,
         register(o.material)
         for cx, cd in oval_centers(o):
             ax.add_patch(Ellipse(
-                (cx * M2CM, cd * M2CM), o.width_m * M2CM, o.height_m * M2CM,
+                (cx * M2MM, cd * M2MM), o.width_m * M2MM, o.height_m * M2MM,
                 facecolor=color(o.material), edgecolor="k", lw=0.8, zorder=3))
 
     # --- surface line + antenna + scan path ---
     ax.axhline(0, color="k", lw=1.5, zorder=5)
-    ax.annotate("", xy=(survey.scan_length_m * M2CM, -depth_span_m * M2CM * 0.06),
-                xytext=(0, -depth_span_m * M2CM * 0.06),
+    ax.annotate("", xy=(survey.scan_length_m * M2MM, -depth_span_m * M2MM * 0.06),
+                xytext=(0, -depth_span_m * M2MM * 0.06),
                 arrowprops=dict(arrowstyle="->", color="crimson", lw=1.8),
                 zorder=6)
-    ax.text(survey.scan_length_m * M2CM / 2, -depth_span_m * M2CM * 0.10,
+    ax.text(survey.scan_length_m * M2MM / 2, -depth_span_m * M2MM * 0.10,
             "scan direction", color="crimson", ha="center", va="bottom",
             fontsize=9)
     # antenna markers at the start position
     ax.plot(0, 0, marker="v", color="crimson", markersize=12, zorder=7)
-    ax.plot(survey.tx_rx_offset_m * M2CM, 0, marker="v", color="darkorange",
+    ax.plot(survey.tx_rx_offset_m * M2MM, 0, marker="v", color="darkorange",
             markersize=10, zorder=7)
 
     # --- axes cosmetics ---
-    ax.set_xlim(-2, x_span_m * M2CM + 2)
-    ax.set_ylim(depth_span_m * M2CM, -depth_span_m * M2CM * 0.15)
-    ax.set_xlabel("Distance along scan [cm]")
-    ax.set_ylabel("Depth [cm]")
+    ax.set_xlim(-20, x_span_m * M2MM + 20)
+    ax.set_ylim(depth_span_m * M2MM, -depth_span_m * M2MM * 0.15)
+    ax.set_xlabel("Distance along scan [mm]")
+    ax.set_ylabel("Depth [mm]")
     ax.set_title(f"{scene.title}  —  preview (not yet simulated)")
     ax.set_aspect("equal", adjustable="box")
     ax.grid(True, ls=":", lw=0.5, alpha=0.6)

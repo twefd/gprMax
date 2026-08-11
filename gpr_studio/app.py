@@ -71,7 +71,7 @@ def _init_state() -> None:
     ss.bars = [
         {"label": "PVC conduit", "x_cm": 45.0, "depth_cm": 12.0,
          "diameter_mm": 50.0, "material": "pvc",
-         "grout_material": "", "grout_diameter_mm": 0.0},
+         "grout_material": "air", "grout_diameter_mm": 42.0},
     ]
     ss.voids = [
         {"label": "Air void", "x_cm": 25.0, "depth_cm": 18.0,
@@ -395,32 +395,35 @@ def _element_colconfig(key: str) -> dict:
     def txt(label, help="", w="small"):
         return C.TextColumn(label, help=help, width=w)
 
+    # All lengths are shown/entered in millimetres. The ``*_cm`` state fields are
+    # scaled by _element_editor at the editor boundary, so these columns keep
+    # their ``*_cm`` keys but display mm values (min/step are the mm equivalents).
     if key == "layers":
         return {"material": _mat_col(),
-                "thickness_cm": num("Thick. cm", "Layer thickness [cm]",
-                                    min_value=0.5, step=0.5)}
+                "thickness_cm": num("Thick. mm", "Layer thickness [mm]",
+                                    min_value=5.0, step=5.0)}
     if key == "rebar":
         return {"label": txt("Label"),
-                "depth_cm": num("Cover cm", "Cover depth to bar centre [cm]",
-                                min_value=0.0, step=0.5),
+                "depth_cm": num("Cover mm", "Cover depth to bar centre [mm]",
+                                min_value=0.0, step=5.0),
                 "diameter_mm": num("Ø mm", "Bar diameter [mm]", min_value=1.0, step=1.0),
-                "spacing_cm": num("Spc cm", "Centre-to-centre spacing [cm]",
-                                  min_value=1.0, step=1.0),
+                "spacing_cm": num("Spc mm", "Centre-to-centre spacing [mm]",
+                                  min_value=10.0, step=10.0),
                 "count": num("n", "Number of bars", min_value=1, step=1),
-                "x_start_cm": num("x₀ cm", "First bar x-position [cm]",
-                                  min_value=0.0, step=1.0),
+                "x_start_cm": num("x₀ mm", "First bar x-position [mm]",
+                                  min_value=0.0, step=10.0),
                 "material": _mat_col()}
     if key == "voids":
         return {"label": txt("Label"),
-                "x_cm": num("x cm", "Left edge x [cm]", min_value=0.0, step=1.0),
-                "depth_cm": num("Top cm", "Depth to the top [cm]", min_value=0.0, step=0.5),
-                "width_cm": num("W cm", "Width [cm]", min_value=0.5, step=0.5),
-                "height_cm": num("H cm", "Height [cm]", min_value=0.2, step=0.2),
+                "x_cm": num("x mm", "Left edge x [mm]", min_value=0.0, step=10.0),
+                "depth_cm": num("Top mm", "Depth to the top [mm]", min_value=0.0, step=5.0),
+                "width_cm": num("W mm", "Width [mm]", min_value=5.0, step=5.0),
+                "height_cm": num("H mm", "Height [mm]", min_value=2.0, step=2.0),
                 "material": _mat_col()}
     if key == "bars":
         return {"label": txt("Label"),
-                "x_cm": num("x cm", "Centre x [cm]", min_value=0.0, step=1.0),
-                "depth_cm": num("Depth cm", "Depth to centre [cm]", min_value=0.0, step=0.5),
+                "x_cm": num("x mm", "Centre x [mm]", min_value=0.0, step=10.0),
+                "depth_cm": num("Depth mm", "Depth to centre [mm]", min_value=0.0, step=5.0),
                 "diameter_mm": num("Ø mm", "Diameter [mm]", min_value=1.0, step=1.0),
                 "material": _mat_col(),
                 "grout_material": C.SelectboxColumn(
@@ -430,9 +433,9 @@ def _element_colconfig(key: str) -> dict:
                                          min_value=0.0, step=1.0)}
     if key == "diagonals":
         return {"label": txt("Label"),
-                "x_cm": num("x cm", "Start x [cm]", min_value=0.0, step=1.0),
-                "depth_cm": num("Depth cm", "Start depth [cm]", min_value=0.0, step=0.5),
-                "length_cm": num("Len cm", "Length [cm]", min_value=0.5, step=0.5),
+                "x_cm": num("x mm", "Start x [mm]", min_value=0.0, step=10.0),
+                "depth_cm": num("Depth mm", "Start depth [mm]", min_value=0.0, step=5.0),
+                "length_cm": num("Len mm", "Length [mm]", min_value=5.0, step=5.0),
                 "angle_deg": num("Ang °", "Angle from horizontal; + tilts "
                                  "down-right [°]", min_value=-89.0, max_value=89.0,
                                  step=5.0),
@@ -441,15 +444,15 @@ def _element_colconfig(key: str) -> dict:
                 "material": _mat_col()}
     if key == "ovals":
         return {"label": txt("Label"),
-                "cx_cm": num("x cm", "First centre x [cm]", min_value=0.0, step=1.0),
-                "depth_cm": num("Depth cm", "Centre depth [cm]", min_value=0.0, step=0.5),
-                "width_cm": num("W Ø cm", "Horizontal diameter [cm]",
-                                min_value=0.5, step=0.5),
-                "height_cm": num("H Ø cm", "Vertical diameter [cm]",
-                                 min_value=0.5, step=0.5),
+                "cx_cm": num("x mm", "First centre x [mm]", min_value=0.0, step=10.0),
+                "depth_cm": num("Depth mm", "Centre depth [mm]", min_value=0.0, step=5.0),
+                "width_cm": num("W Ø mm", "Horizontal diameter [mm]",
+                                min_value=5.0, step=5.0),
+                "height_cm": num("H Ø mm", "Vertical diameter [mm]",
+                                 min_value=5.0, step=5.0),
                 "count": num("n", "Number of ovals", min_value=1, step=1),
-                "spacing_cm": num("Spc cm", "Centre-to-centre spacing [cm]",
-                                  min_value=0.0, step=1.0),
+                "spacing_cm": num("Spc mm", "Centre-to-centre spacing [mm]",
+                                  min_value=0.0, step=10.0),
                 "material": _mat_col()}
     return {}
 
@@ -486,9 +489,16 @@ def _element_editor(state_key: str, title: str, optional: bool = False) -> None:
         return
 
     template = _ELEMENT_TEMPLATES[state_key]
+    # The tables show every length in millimetres for consistency, while the
+    # scene state (and saved .gprstudio.json) keep these ``*_cm`` fields in
+    # centimetres. Convert cm -> mm when seeding the editor and mm -> cm on read.
+    cm_cols = [k for k in template if k.endswith("_cm")]
     base_key = f"{state_key}__base__{n}"
     if base_key not in ss:
-        ss[base_key] = pd.DataFrame(rows, columns=list(template.keys()))
+        df = pd.DataFrame(rows, columns=list(template.keys()))
+        for c in cm_cols:
+            df[c] = pd.to_numeric(df[c], errors="coerce") * 10.0
+        ss[base_key] = df
 
     hdr = st.columns([5, 1])
     hdr[0].markdown(f"**{title}**")
@@ -500,7 +510,13 @@ def _element_editor(state_key: str, title: str, optional: bool = False) -> None:
         ss[base_key], hide_index=True, num_rows="dynamic", width="stretch",
         row_height=40, key=f"{state_key}_editor_{n}",
         column_config=_element_colconfig(state_key))
-    ss[state_key] = edited.to_dict("records")
+    records = edited.to_dict("records")
+    for r in records:
+        for c in cm_cols:
+            v = r.get(c)
+            if v is not None and v == v:  # skip None / NaN (blank cells)
+                r[c] = float(v) / 10.0
+    ss[state_key] = records
 
 
 def section_geometry() -> None:
@@ -802,9 +818,8 @@ def _show_last_result() -> None:
 # --------------------------------------------------------------------------- #
 def main() -> None:
     _init_state()
-    st.title("📡 gprStudio")
-    st.caption("Model real concrete-inspection scenarios with gprMax — build, "
-               "preview, simulate.")
+    st.title("gprStudio")
+    st.caption("GPR model simulation using gprMax")
 
     tabs = st.tabs(["① Equipment & survey", "② Materials",
                     "③ Geometry & preview", "④ Run & results"])
