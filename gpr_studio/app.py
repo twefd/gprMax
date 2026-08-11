@@ -617,6 +617,20 @@ def section_run() -> None:
     st.caption(f"Ready to simulate **{scene.title}** — "
                f"{survey.num_traces} traces, {survey.dx_m*1000:.2f} mm cells.")
 
+    # Performance: split B-scan traces across worker processes (task farm).
+    cores = os.cpu_count() or 4
+    default_workers = runner.auto_workers(survey.num_traces)
+    workers = st.slider(
+        "⚡ Parallel workers (B-scan)", 1, cores, default_workers,
+        key="bscan_workers",
+        help="Split the B-scan traces across this many gprMax processes. "
+             "~8 is the sweet spot (beyond that these small models saturate "
+             "memory bandwidth). Results are identical to a sequential run. "
+             "Set to 1 to keep the machine responsive.")
+    threads_per = max(1, cores // workers)
+    st.caption(f"{workers} worker(s) × {threads_per} thread(s) — uses "
+               f"`--geometry-fixed` (geometry built once, only the antenna moves).")
+
     c1, c2, c3 = st.columns(3)
     do_geom = c1.button("Validate geometry", width="stretch",
                         help="Fast --geometry-only build to check the model parses")
@@ -647,12 +661,24 @@ def section_run() -> None:
             progress.progress(cur / max(tot, 1),
                               text=f"Simulating model {cur}/{tot}")
 
-    n = survey.num_traces if do_bscan else None
-    with st.spinner("Running gprMax…"):
-        rc = runner.run_gprmax(in_path, n_traces=n, geometry_only=do_geom,
-                               on_line=on_line)
+    if do_bscan:
+        n = survey.num_traces
+
+        def on_prog(done: int, tot: int) -> None:
+            progress.progress(done / max(tot, 1),
+                              text=f"Simulating trace {done}/{tot} · "
+                                   f"{workers}×{threads_per} threads")
+
+        with st.spinner(f"Running B-scan on {workers} worker(s)…"):
+            rc, plog = runner.run_bscan_parallel(in_path, n, workers,
+                                                 on_progress=on_prog)
+        log_lines = plog.splitlines()
+    else:
+        with st.spinner("Running gprMax…"):
+            rc = runner.run_gprmax(in_path, geometry_only=do_geom,
+                                   on_line=on_line)
     progress.empty()
-    log_box.code("\n".join(log_lines[-60:]) or "(no output)", language="text")
+    log_box.code("\n".join(log_lines[-80:]) or "(no output)", language="text")
 
     if rc != 0:
         status.error(f"gprMax exited with code {rc}. See the solver log.")
